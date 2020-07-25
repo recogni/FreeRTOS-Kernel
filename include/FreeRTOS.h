@@ -1290,6 +1290,6 @@ typedef StaticStreamBuffer_t StaticMessageBuffer_t;
 #ifdef __cplusplus
 }
 #endif
-
+extern u64 debug_locator;
 #endif /* INC_FREERTOS_H */
 

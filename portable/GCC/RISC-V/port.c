@@ -167,6 +167,7 @@ BaseType_t xPortStartScheduler(void)
 {
     extern void xPortStartFirstTask(void);
 
+	vRaisePrivilege();
 #if (configASSERT_DEFINED == 1)
     {
         volatile uint32_t mtvec = 0;

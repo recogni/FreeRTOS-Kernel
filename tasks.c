@@ -1013,6 +1013,7 @@ UBaseType_t x;
 	but had been interrupted by the scheduler.  The return address is set
 	to the start of the task function. Once the stack has been initialised
 	the top of stack variable is updated. */
+	vRaisePrivilege();
 	#if( portUSING_MPU_WRAPPERS == 1 )
 	{
 		/* If the port has capability to detect stack overflow,
@@ -1059,6 +1060,7 @@ UBaseType_t x;
 		}
 		#endif /* portHAS_STACK_OVERFLOW_CHECKING */
 	}
+	vResetPrivilege();
 	#endif /* portUSING_MPU_WRAPPERS */
 
 	if( pxCreatedTask != NULL )
@@ -1156,7 +1158,7 @@ static void prvAddNewTaskToReadyList( TCB_t *pxNewTCB )
 	}
 }
 /*-----------------------------------------------------------*/
-
+//extern u64 debug_locator;
 #if ( INCLUDE_vTaskDelete == 1 )
 
 	void vTaskDelete( TaskHandle_t xTaskToDelete )
@@ -1170,6 +1172,7 @@ static void prvAddNewTaskToReadyList( TCB_t *pxNewTCB )
 			pxTCB = prvGetTCBFromHandle( xTaskToDelete );
 
 			/* Remove task from the ready/delayed list. */
+			debug_locator = 1;
 			if( uxListRemove( &( pxTCB->xStateListItem ) ) == ( UBaseType_t ) 0 )
 			{
 				taskRESET_READY_PRIORITY( pxTCB->uxPriority );
@@ -1661,6 +1664,7 @@ static void prvAddNewTaskToReadyList( TCB_t *pxNewTCB )
 					/* The task is currently in its ready list - remove before
 					adding it to it's new ready list.  As we are in a critical
 					section we can do this even if the scheduler is suspended. */
+					debug_locator = 2;
 					if( uxListRemove( &( pxTCB->xStateListItem ) ) == ( UBaseType_t ) 0 )
 					{
 						/* It is known that the task is in its ready list so
@@ -1715,6 +1719,7 @@ static void prvAddNewTaskToReadyList( TCB_t *pxNewTCB )
 
 			/* Remove task from the ready/delayed list and place in the
 			suspended list. */
+			debug_locator = 3;
 			if( uxListRemove( &( pxTCB->xStateListItem ) ) == ( UBaseType_t ) 0 )
 			{
 				taskRESET_READY_PRIORITY( pxTCB->uxPriority );
@@ -1727,6 +1732,7 @@ static void prvAddNewTaskToReadyList( TCB_t *pxNewTCB )
 			/* Is the task waiting on an event also? */
 			if( listLIST_ITEM_CONTAINER( &( pxTCB->xEventListItem ) ) != NULL )
 			{
+				debug_locator = 4;
 				( void ) uxListRemove( &( pxTCB->xEventListItem ) );
 			}
 			else
@@ -1867,6 +1873,7 @@ static void prvAddNewTaskToReadyList( TCB_t *pxNewTCB )
 
 					/* The ready list can be accessed even if the scheduler is
 					suspended because this is inside a critical section. */
+					debug_locator = 5;
 					( void ) uxListRemove(  &( pxTCB->xStateListItem ) );
 					prvAddTaskToReadyList( pxTCB );
 
@@ -1947,7 +1954,7 @@ static void prvAddNewTaskToReadyList( TCB_t *pxNewTCB )
 					{
 						mtCOVERAGE_TEST_MARKER();
 					}
-
+					debug_locator = 6;
 					( void ) uxListRemove( &( pxTCB->xStateListItem ) );
 					prvAddTaskToReadyList( pxTCB );
 				}
@@ -2218,7 +2225,9 @@ BaseType_t xAlreadyYielded = pdFALSE;
 				while( listLIST_IS_EMPTY( &xPendingReadyList ) == pdFALSE )
 				{
 					pxTCB = listGET_OWNER_OF_HEAD_ENTRY( ( &xPendingReadyList ) ); /*lint !e9079 void * is used as this macro is used with timers and co-routines too.  Alignment is known to be fine as the type of the pointer stored and retrieved is the same. */
+					debug_locator = 7;
 					( void ) uxListRemove( &( pxTCB->xEventListItem ) );
+					debug_locator = 8;
 					( void ) uxListRemove( &( pxTCB->xStateListItem ) );
 					prvAddTaskToReadyList( pxTCB );
 
@@ -2644,6 +2653,7 @@ BaseType_t xYieldOccurred;
 				/* Remove the reference to the task from the blocked list.  An
 				interrupt won't touch the xStateListItem because the
 				scheduler is suspended. */
+				debug_locator = 9;
 				( void ) uxListRemove( &( pxTCB->xStateListItem ) );
 
 				/* Is the task waiting on an event also?  If so remove it from
@@ -2654,6 +2664,7 @@ BaseType_t xYieldOccurred;
 				{
 					if( listLIST_ITEM_CONTAINER( &( pxTCB->xEventListItem ) ) != NULL )
 					{
+						debug_locator = 10;
 						( void ) uxListRemove( &( pxTCB->xEventListItem ) );
 
 						/* This lets the task know it was forcibly removed from the
@@ -2776,12 +2787,14 @@ BaseType_t xSwitchRequired = pdFALSE;
 					}
 
 					/* It is time to remove the item from the Blocked state. */
+					debug_locator = 11;
 					( void ) uxListRemove( &( pxTCB->xStateListItem ) );
 
 					/* Is the task waiting on an event also?  If so remove
 					it from the event list. */
 					if( listLIST_ITEM_CONTAINER( &( pxTCB->xEventListItem ) ) != NULL )
 					{
+						debug_locator = 12;
 						( void ) uxListRemove( &( pxTCB->xEventListItem ) );
 					}
 					else
@@ -3134,11 +3147,15 @@ void vTaskPlaceOnUnorderedEventList( List_t * pxEventList, const TickType_t xIte
 
 #endif /* configUSE_TIMERS */
 /*-----------------------------------------------------------*/
+ListItem_t *ublck_tcb;
+List_t *evnt_lst;
 
 BaseType_t xTaskRemoveFromEventList( const List_t * const pxEventList )
 {
 TCB_t *pxUnblockedTCB;
 BaseType_t xReturn;
+
+evnt_lst = pxEventList;
 
 	/* THIS FUNCTION MUST BE CALLED FROM A CRITICAL SECTION.  It can also be
 	called from a critical section within an ISR. */
@@ -3154,11 +3171,14 @@ BaseType_t xReturn;
 	This function assumes that a check has already been made to ensure that
 	pxEventList is not empty. */
 	pxUnblockedTCB = listGET_OWNER_OF_HEAD_ENTRY( pxEventList ); /*lint !e9079 void * is used as this macro is used with timers and co-routines too.  Alignment is known to be fine as the type of the pointer stored and retrieved is the same. */
+	ublck_tcb = pxUnblockedTCB;
+
 	configASSERT( pxUnblockedTCB );
 	( void ) uxListRemove( &( pxUnblockedTCB->xEventListItem ) );
 
 	if( uxSchedulerSuspended == ( UBaseType_t ) pdFALSE )
 	{
+		debug_locator = 13;
 		( void ) uxListRemove( &( pxUnblockedTCB->xStateListItem ) );
 		prvAddTaskToReadyList( pxUnblockedTCB );
 
@@ -3218,6 +3238,7 @@ TCB_t *pxUnblockedTCB;
 	event flags. */
 	pxUnblockedTCB = listGET_LIST_ITEM_OWNER( pxEventListItem ); /*lint !e9079 void * is used as this macro is used with timers and co-routines too.  Alignment is known to be fine as the type of the pointer stored and retrieved is the same. */
 	configASSERT( pxUnblockedTCB );
+	debug_locator = 14;
 	( void ) uxListRemove( pxEventListItem );
 
 	#if( configUSE_TICKLESS_IDLE != 0 )
@@ -3237,6 +3258,7 @@ TCB_t *pxUnblockedTCB;
 	/* Remove the task from the delayed list and add it to the ready list.  The
 	scheduler is suspended so interrupts will not be accessing the ready
 	lists. */
+	debug_locator = 15;
 	( void ) uxListRemove( &( pxUnblockedTCB->xStateListItem ) );
 	prvAddTaskToReadyList( pxUnblockedTCB );
 
@@ -3658,6 +3680,7 @@ static void prvCheckTasksWaitingTermination( void )
 			taskENTER_CRITICAL();
 			{
 				pxTCB = listGET_OWNER_OF_HEAD_ENTRY( ( &xTasksWaitingTermination ) ); /*lint !e9079 void * is used as this macro is used with timers and co-routines too.  Alignment is known to be fine as the type of the pointer stored and retrieved is the same. */
+				debug_locator = 16;
 				( void ) uxListRemove( &( pxTCB->xStateListItem ) );
 				--uxCurrentNumberOfTasks;
 				--uxDeletedTasksWaitingCleanUp;
@@ -4045,6 +4068,7 @@ static void prvResetNextTaskUnblockTime( void )
 				to be moved into a new list. */
 				if( listIS_CONTAINED_WITHIN( &( pxReadyTasksLists[ pxMutexHolderTCB->uxPriority ] ), &( pxMutexHolderTCB->xStateListItem ) ) != pdFALSE )
 				{
+					debug_locator = 17;
 					if( uxListRemove( &( pxMutexHolderTCB->xStateListItem ) ) == ( UBaseType_t ) 0 )
 					{
 						/* It is known that the task is in its ready list so
@@ -4131,6 +4155,7 @@ static void prvResetNextTaskUnblockTime( void )
 					given from an interrupt, and if a mutex is given by the
 					holding task then it must be the running state task.  Remove
 					the holding task from the ready list. */
+					debug_locator = 18;
 					if( uxListRemove( &( pxTCB->xStateListItem ) ) == ( UBaseType_t ) 0 )
 					{
 						portRESET_READY_PRIORITY( pxTCB->uxPriority, uxTopReadyPriority );
@@ -4249,6 +4274,7 @@ static void prvResetNextTaskUnblockTime( void )
 					Ready list per priority. */
 					if( listIS_CONTAINED_WITHIN( &( pxReadyTasksLists[ uxPriorityUsedOnEntry ] ), &( pxTCB->xStateListItem ) ) != pdFALSE )
 					{
+						debug_locator = 19;
 						if( uxListRemove( &( pxTCB->xStateListItem ) ) == ( UBaseType_t ) 0 )
 						{
 							/* It is known that the task is in its ready list so
@@ -4849,6 +4875,7 @@ TickType_t uxReturn;
 			notification then unblock it now. */
 			if( ucOriginalNotifyState == taskWAITING_NOTIFICATION )
 			{
+				debug_locator = 20;
 				( void ) uxListRemove( &( pxTCB->xStateListItem ) );
 				prvAddTaskToReadyList( pxTCB );
 
@@ -4986,6 +5013,7 @@ TickType_t uxReturn;
 
 				if( uxSchedulerSuspended == ( UBaseType_t ) pdFALSE )
 				{
+					debug_locator = 21;
 					( void ) uxListRemove( &( pxTCB->xStateListItem ) );
 					prvAddTaskToReadyList( pxTCB );
 				}
@@ -5074,6 +5102,7 @@ TickType_t uxReturn;
 
 				if( uxSchedulerSuspended == ( UBaseType_t ) pdFALSE )
 				{
+					debug_locator = 22;
 					( void ) uxListRemove( &( pxTCB->xStateListItem ) );
 					prvAddTaskToReadyList( pxTCB );
 				}
@@ -5193,6 +5222,7 @@ const TickType_t xConstTickCount = xTickCount;
 
 	/* Remove the task from the ready list before adding it to the blocked list
 	as the same list item is used for both lists. */
+	debug_locator = 23;
 	if( uxListRemove( &( pxCurrentTCB->xStateListItem ) ) == ( UBaseType_t ) 0 )
 	{
 		/* The current task must be in a ready list, so there is no need to

@@ -511,6 +511,7 @@ Timer_t * const pxTimer = ( Timer_t * ) listGET_OWNER_OF_HEAD_ENTRY( pxCurrentTi
 
 	/* Remove the timer from the list of active timers.  A check has already
 	been performed to ensure the list is not empty. */
+	debug_locator = 23;
 	( void ) uxListRemove( &( pxTimer->xTimerListItem ) );
 	traceTIMER_EXPIRED( pxTimer );
 
@@ -773,6 +774,7 @@ TickType_t xTimeNow;
 			if( listIS_CONTAINED_WITHIN( NULL, &( pxTimer->xTimerListItem ) ) == pdFALSE ) /*lint !e961. The cast is only redundant when NULL is passed into the macro. */
 			{
 				/* The timer is in a list, remove it. */
+				debug_locator = 24;
 				( void ) uxListRemove( &( pxTimer->xTimerListItem ) );
 			}
 			else
@@ -896,6 +898,7 @@ BaseType_t xResult;
 
 		/* Remove the timer from the list. */
 		pxTimer = ( Timer_t * ) listGET_OWNER_OF_HEAD_ENTRY( pxCurrentTimerList ); /*lint !e9087 !e9079 void * is used as this macro is used with tasks and co-routines too.  Alignment is known to be fine as the type of the pointer stored and retrieved is the same. */
+		debug_locator = 25;
 		( void ) uxListRemove( &( pxTimer->xTimerListItem ) );
 		traceTIMER_EXPIRED( pxTimer );
 

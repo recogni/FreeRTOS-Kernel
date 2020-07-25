@@ -69,6 +69,8 @@
 
 #include "freertos_risc_v_chip_specific_extensions.h"
 
+//#include "../../../../../src/scpu/hal/drivers/priviledge.h"
+
 /* Check the freertos_risc_v_chip_specific_extensions.h and/or command line
 definitions. */
 #if defined( portasmHAS_CLINT ) && defined( portasmHAS_MTIME )
@@ -100,9 +102,15 @@ specific version of freertos_risc_v_chip_specific_extensions.h.  See the notes
 at the top of this file. */
 #define portCONTEXT_SIZE ( 30 * portWORD_SIZE )
 
+#define use_PRIVILEDGE_MODE 1
+
+
 .global xPortStartFirstTask
 .global freertos_risc_v_trap_handler
 .global pxPortInitialiseStack
+
+.global record_sp
+
 .extern pxCurrentTCB
 .extern ulPortTrapHandler
 .extern vTaskSwitchContext
@@ -114,11 +122,142 @@ at the top of this file. */
 .extern xISRStackTop
 .extern portasmHANDLE_INTERRUPT
 
+.extern	mmu_setup
+.extern	vResetPrivilege
+
+.extern cnt_first_task
+.extern int_cnter
+.extern ecall_cnter
+.extern ecall_cnt
+.extern debug_search
+.extern sp_data
+
+#if( use_PRIVILEDGE_MODE == 1 )
+.extern privilege_status
+#endif
 /*-----------------------------------------------------------*/
 
 .align 8
 .func
 freertos_risc_v_trap_handler:
+
+	//csrr	t0, mstatus
+	//csrw	mscratch, t0
+	//nop
+	//j freertos_risc_v_trap_handler
+#if( use_PRIVILEDGE_MODE == 1 )
+	//csrw	mscratch, t0
+    csrr	t0, mcause
+
+	addi	t0, t0, -8
+	blt		t0, x0, handle_other_traps /* mcause < 8, not ecall */
+	addi	t0, t0, -3
+	bgt		t0,	x0,	handle_other_traps
+environment_switch:
+	
+#if 0 //for debug
+	//call ecall_cnter
+	load_x t1, ecall_cnt
+	addi t1, t1, 1
+	la t2, ecall_cnt
+    sw t1, 0(t2)
+#endif
+	csrw	mscratch, a0
+
+	beq	a0,	x0, handle_other_traps
+	la t0, 1f
+	slli	a0, a0, 2
+	add t0, t0, a0
+	jr t0
+1:
+	jal x0, ecall_yield
+	jal x0, ecall_disable_interrupt
+	jal x0, ecall_enable_interrupt
+	jal x0, ecall_switch_to_machine
+	jal x0, ecall_switch_to_supervisor
+
+#if 1
+ecall_disable_interrupt:
+	/* Clear mpie */
+	li a0, 0x80
+	csrc mstatus, a0
+
+	li a0, 0x880
+	csrc mie, a0
+	j ecall_mret
+
+ecall_enable_interrupt:
+	/* Set mpie */
+	li a0, 0x80
+	csrs mstatus, a0
+
+	li a0, 0x880
+	csrs mie, a0
+	j ecall_mret
+
+ecall_switch_to_machine:
+	/* Set mpp */
+	li a0, 0x1800
+	csrs mstatus, a0
+	j ecall_mret
+
+ecall_switch_to_supervisor:
+	/* Clear mpp */
+	li a0, 0x1000
+	csrc mstatus, a0
+	li a0, 0x800
+	csrs mstatus, a0
+	j ecall_mret
+#else
+ecall_disable_interrupt:
+	/* Clear mpie */
+	li a0, 0x880
+	csrc mie, a0
+	j ecall_mret
+
+ecall_enable_interrupt:
+	/* Set mpie */
+	li a0, 0x800
+	csrs mie, a0
+	j ecall_mret
+
+ecall_switch_to_machine:
+	/* Set mpp */
+	li a0, 0x1800
+	csrs mstatus, a0
+	j ecall_mret
+
+ecall_switch_to_supervisor:
+	/* Clear mpp */
+	li a0, 0x1800
+	csrc mstatus, a0
+	li a0, 0x800
+	csrs mstatus, a0
+	j ecall_mret
+#endif
+ecall_mret:
+	csrr t0, mstatus
+    li a0, 0x1800
+    and t0, t0, a0
+    srli t0, t0, 11
+    la a0, privilege_status
+    sw t0, 0(a0)
+
+	csrr t0, mepc
+	addi	t0, t0, 4
+	csrw	mepc, t0
+	/* restore t0 */
+	//csrr	t0, mscratch
+	mret
+
+ecall_yield:
+
+handle_other_traps:
+	nop
+	//j handle_other_traps
+#endif
+	//csrw	mscratch, sp
+	
 	addi sp, sp, -portCONTEXT_SIZE
 	store_x x1, 1 * portWORD_SIZE( sp )
 	store_x x5, 2 * portWORD_SIZE( sp )
@@ -180,6 +319,15 @@ handle_asynchronous:
 		load_x t0, pullMachineTimerCompareRegister  /* Load address of compare register into t0. */
 		load_x t1, pullNextTime  		/* Load the address of ullNextTime into t1. */
 
+#if 1 /*for debug*/
+	//call ecall_cnter
+	load_x t5, ecall_cnt
+	addi t5, t5, 1
+	la t6, ecall_cnt
+    sw t5, 0(t6)
+#endif
+
+
 		#if( __riscv_xlen == 32 )
 
 			/* Update the 64-bit mtimer compare match value in two 32-bit writes. */
@@ -221,6 +369,14 @@ handle_asynchronous:
 
 #endif /* portasmHAS_MTIME */
 
+#if 1 /*for debug*/
+	//call ecall_cnter
+	load_x t1, int_cnt
+	addi t1, t1, 1
+	la t2, int_cnt
+    sw t1, 0(t2)
+#endif
+
 	load_x sp, xISRStackTop				/* Switch to ISR stack before function call. */
 	jal portasmHANDLE_INTERRUPT			/* Jump to the interrupt handler if there is no CLINT or if there is a CLINT and it has been determined that an external interrupt is pending. */
 	j processed_source
@@ -230,7 +386,11 @@ handle_synchronous:
 	store_x a1, 0( sp )					/* Save updated exception return address. */
 
 test_if_environment_call:
+#if( use_PRIVILEDGE_MODE != 1 )
 	li t0, 11 							/* 11 == environment call. */
+#else
+	li t0, 9 							/* 11 == environment call. */
+#endif
 	bne a0, t0, is_exception			/* Not an M environment call, so some other exception. */
 	load_x sp, xISRStackTop				/* Switch to ISR stack before function call. */
 	jal vTaskSwitchContext
@@ -290,6 +450,20 @@ processed_source:
 	load_x  x31, 28 * portWORD_SIZE( sp )	/* t6 */
 	addi sp, sp, portCONTEXT_SIZE
 
+#if( use_PRIVILEDGE_MODE == 1 )
+	li a0, 0x1000
+	csrc mstatus, a0
+	li a0, 0x800
+	csrs mstatus, a0
+
+	csrr t0, mstatus
+    li a0, 0x1800
+    and t0, t0, a0
+    srli t0, t0, 11
+    la a0, privilege_status
+    sw t0, 0(a0)
+#endif
+
 	mret
 	.endfunc
 /*-----------------------------------------------------------*/
@@ -312,10 +486,15 @@ xPortStartFirstTask:
 	load_x  x1, 0( sp ) /* Note for starting the scheduler the exception return address is used as the function return address. */
 
 	portasmRESTORE_ADDITIONAL_REGISTERS	/* Defined in freertos_risc_v_chip_specific_extensions.h to restore any registers unique to the RISC-V implementation. */
-
+#if 0 //( use_PRIVILEDGE_MODE == 1 )
+	load_x  t0, 29 * portWORD_SIZE( sp )	/* mstatus */
+	addi t0, t0, 0x80						/* Set MPIE bit so the first task starts with interrupts enabled - required as returns with ret not eret. */
+	csrrw  x0, mstatus, t0					
+//#else
 	load_x  t0, 29 * portWORD_SIZE( sp )	/* mstatus */
 	addi t0, t0, 0x08						/* Set MIE bit so the first task starts with interrupts enabled - required as returns with ret not eret. */
 	csrrw  x0, mstatus, t0					/* Interrupts enabled from here! */
+#endif
 
 	load_x  x5, 2 * portWORD_SIZE( sp )		/* t0 */
 	load_x  x6, 3 * portWORD_SIZE( sp )		/* t1 */
@@ -345,6 +524,12 @@ xPortStartFirstTask:
 	load_x  x30, 27 * portWORD_SIZE( sp )	/* t5 */
 	load_x  x31, 28 * portWORD_SIZE( sp )	/* t6 */
 	addi	sp, sp, portCONTEXT_SIZE
+
+#if( use_PRIVILEDGE_MODE == 1 )
+	li a0, 4
+	ecall	
+#endif
+
 	ret
 	.endfunc
 /*-----------------------------------------------------------*/
@@ -415,8 +600,17 @@ xPortStartFirstTask:
 .func
 pxPortInitialiseStack:
 
+#if 1 /*for debug*/
+	//call ecall_cnter
+	load_x t1, first_task_cnt
+	addi t1, t1, 1
+	la t2, first_task_cnt
+    sw t1, 0(t2)
+#endif
+
 	csrr t0, mstatus					/* Obtain current mstatus value. */
-	addi t1, x0, 0x188					/* Generate the value 0x1880, which are the MPIE and MPP bits to set in mstatus. */
+	//addi t1, x0, 0x188					/* Generate the value 0x1880, which are the MPIE and MPP bits to set in mstatus. */
+	addi t1, x0, 0x180
 	slli t1, t1, 4
 	or t0, t0, t1						/* Set MPIE and MPP bits in mstatus value. */
 
@@ -436,6 +630,14 @@ chip_specific_stack_frame:				/* First add any chip specific registers to the st
 1:
 	addi a0, a0, -portWORD_SIZE
 	store_x a1, 0(a0)					/* mret value (pxCode parameter) onto the stack. */
+	
 	ret
 	.endfunc
 /*-----------------------------------------------------------*/
+
+.align 8
+.func
+record_sp:
+	la  t0, sp_data			/* Load pxCurrentTCB. */
+	sw  sp, 0( t0 )
+	ret
