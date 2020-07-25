@@ -3147,7 +3147,7 @@ void vTaskPlaceOnUnorderedEventList( List_t * pxEventList, const TickType_t xIte
 
 #endif /* configUSE_TIMERS */
 /*-----------------------------------------------------------*/
-ListItem_t *ublck_tcb;
+TCB_t *ublck_tcb;
 List_t *evnt_lst;
 
 BaseType_t xTaskRemoveFromEventList( const List_t * const pxEventList )
