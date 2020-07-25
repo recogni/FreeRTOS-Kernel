@@ -69,6 +69,8 @@
 
 #include "freertos_risc_v_chip_specific_extensions.h"
 
+//#include "../../../../../src/scpu/hal/drivers/priviledge.h"
+
 /* Check the freertos_risc_v_chip_specific_extensions.h and/or command line
 definitions. */
 #if defined( portasmHAS_CLINT ) && defined( portasmHAS_MTIME )
@@ -217,7 +219,7 @@ ecall_yield:
 
 handle_other_traps:
 #endif
-	
+
 	addi sp, sp, -portCONTEXT_SIZE
 	store_x x1, 1 * portWORD_SIZE( sp )
 	store_x x5, 2 * portWORD_SIZE( sp )
@@ -279,6 +281,15 @@ handle_asynchronous:
 		load_x t0, pullMachineTimerCompareRegister  /* Load address of compare register into t0. */
 		load_x t1, pullNextTime  		/* Load the address of ullNextTime into t1. */
 
+#if 1 /*for debug*/
+	//call ecall_cnter
+	load_x t5, ecall_cnt
+	addi t5, t5, 1
+	la t6, ecall_cnt
+    sw t5, 0(t6)
+#endif
+
+
 		#if( __riscv_xlen == 32 )
 
 			/* Update the 64-bit mtimer compare match value in two 32-bit writes. */
@@ -319,6 +330,14 @@ handle_asynchronous:
 		bne a0, t1, as_yet_unhandled	/* Something as yet unhandled. */
 
 #endif /* portasmHAS_MTIME */
+
+#if 1 /*for debug*/
+	//call ecall_cnter
+	load_x t1, int_cnt
+	addi t1, t1, 1
+	la t2, int_cnt
+    sw t1, 0(t2)
+#endif
 
 	load_x sp, xISRStackTop				/* Switch to ISR stack before function call. */
 	jal portasmHANDLE_INTERRUPT			/* Jump to the interrupt handler if there is no CLINT or if there is a CLINT and it has been determined that an external interrupt is pending. */
@@ -379,7 +398,7 @@ processed_source:
     li a0, 0x1800
     and t0, t0, a0
     srli t0, t0, 11
-	
+
 #if 0	//for debug
 	csrr t1, mie
 	la t6, int_record
@@ -426,6 +445,20 @@ processed_source:
 	load_x  x30, 27 * portWORD_SIZE( sp )	/* t5 */
 	load_x  x31, 28 * portWORD_SIZE( sp )	/* t6 */
 	addi sp, sp, portCONTEXT_SIZE
+
+#if( use_PRIVILEDGE_MODE == 1 )
+	li a0, 0x1000
+	csrc mstatus, a0
+	li a0, 0x800
+	csrs mstatus, a0
+
+	csrr t0, mstatus
+    li a0, 0x1800
+    and t0, t0, a0
+    srli t0, t0, 11
+    la a0, privilege_status
+    sw t0, 0(a0)
+#endif
 
 	mret
 	.endfunc
@@ -489,7 +522,7 @@ xPortStartFirstTask:
 	addi	sp, sp, portCONTEXT_SIZE
 
 #if( USE_PRIVILEDGE_MODE != 0 )
-	ecall	
+	ecall
 #endif
 
 	ret
@@ -562,6 +595,14 @@ xPortStartFirstTask:
 .func
 pxPortInitialiseStack:
 
+#if 1 /*for debug*/
+	//call ecall_cnter
+	load_x t1, first_task_cnt
+	addi t1, t1, 1
+	la t2, first_task_cnt
+    sw t1, 0(t2)
+#endif
+
 	csrr t0, mstatus					/* Obtain current mstatus value. */
 #if ( USE_PRIVILEDGE_MODE == 0 )
 	addi t1, x0, 0x188					/* Generate the value 0x1880, which are the MPIE and MPP bits to set in mstatus. */
@@ -587,7 +628,14 @@ chip_specific_stack_frame:				/* First add any chip specific registers to the st
 1:
 	addi a0, a0, -portWORD_SIZE
 	store_x a1, 0(a0)					/* mret value (pxCode parameter) onto the stack. */
-	
+
 	ret
 	.endfunc
 /*-----------------------------------------------------------*/
+
+.align 8
+.func
+record_sp:
+	la  t0, sp_data			/* Load pxCurrentTCB. */
+	sw  sp, 0( t0 )
+	ret
