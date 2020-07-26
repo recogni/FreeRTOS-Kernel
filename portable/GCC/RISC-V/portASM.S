@@ -102,7 +102,7 @@ specific version of freertos_risc_v_chip_specific_extensions.h.  See the notes
 at the top of this file. */
 #define portCONTEXT_SIZE ( 30 * portWORD_SIZE )
 
-#define use_PRIVILEDGE_MODE 1
+#define USE_PRIVILEDGE_MODE 1
 
 
 .global xPortStartFirstTask
@@ -134,7 +134,7 @@ at the top of this file. */
 .extern time_int_cnt
 .extern val
 
-#if( use_PRIVILEDGE_MODE == 1 )
+#if( USE_PRIVILEDGE_MODE == 1 )
 .extern privilege_status
 #endif
 /*-----------------------------------------------------------*/
@@ -147,7 +147,7 @@ freertos_risc_v_trap_handler:
 	//csrw	mscratch, t0
 	//nop
 	//j freertos_risc_v_trap_handler
-#if( use_PRIVILEDGE_MODE == 1 )
+#if( USE_PRIVILEDGE_MODE == 1 )
 	//csrw	mscratch, t0
     csrr	t0, mcause
 
@@ -420,7 +420,7 @@ handle_synchronous:
 	store_x a1, 0( sp )					/* Save updated exception return address. */
 
 test_if_environment_call:
-#if( use_PRIVILEDGE_MODE != 1 )
+#if( USE_PRIVILEDGE_MODE != 1 )
 	li t0, 11 							/* 11 == environment call. */
 #else
 	li t0, 9 							/* 11 == environment call. */
@@ -454,7 +454,7 @@ processed_source:
 	//load_x  t0, 29 * portWORD_SIZE( sp )
 	//csrw mstatus, t0						/* Required for MPIE bit. */
 
-#if( use_PRIVILEDGE_MODE == 1 )
+#if( USE_PRIVILEDGE_MODE == 1 )
 	li a0, 0x1000
 	csrc mstatus, a0
 	li a0, 0x800
@@ -520,7 +520,7 @@ xPortStartFirstTask:
 	load_x  x1, 0( sp ) /* Note for starting the scheduler the exception return address is used as the function return address. */
 
 	portasmRESTORE_ADDITIONAL_REGISTERS	/* Defined in freertos_risc_v_chip_specific_extensions.h to restore any registers unique to the RISC-V implementation. */
-#if 0 //( use_PRIVILEDGE_MODE == 1 )
+#if 0 //( USE_PRIVILEDGE_MODE == 1 )
 	load_x  t0, 29 * portWORD_SIZE( sp )	/* mstatus */
 	addi t0, t0, 0x80						/* Set MPIE bit so the first task starts with interrupts enabled - required as returns with ret not eret. */
 	csrrw  x0, mstatus, t0					
@@ -530,7 +530,7 @@ xPortStartFirstTask:
 	csrrw  x0, mstatus, t0					/* Interrupts enabled from here! */
 #endif
 
-#if( use_PRIVILEDGE_MODE == 1 )
+#if( USE_PRIVILEDGE_MODE == 1 )
 	la t6, val
 	addi t4, x0, 4
 	sw t4, 0(t6)
@@ -565,7 +565,7 @@ xPortStartFirstTask:
 	load_x  x31, 28 * portWORD_SIZE( sp )	/* t6 */
 	addi	sp, sp, portCONTEXT_SIZE
 
-#if( use_PRIVILEDGE_MODE == 1 )
+#if( USE_PRIVILEDGE_MODE == 1 )
 	ecall	
 #endif
 
@@ -673,10 +673,3 @@ chip_specific_stack_frame:				/* First add any chip specific registers to the st
 	ret
 	.endfunc
 /*-----------------------------------------------------------*/
-
-.align 8
-.func
-record_sp:
-	la  t0, sp_data			/* Load pxCurrentTCB. */
-	sw  sp, 0( t0 )
-	ret

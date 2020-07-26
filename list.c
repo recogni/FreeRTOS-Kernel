@@ -166,11 +166,9 @@ const TickType_t xValueOfInsertion = pxNewListItem->xItemValue;
 	( pxList->uxNumberOfItems )++;
 }
 /*-----------------------------------------------------------*/
-//volatile
-u64 sp_data;
+
 UBaseType_t uxListRemove( ListItem_t * const pxItemToRemove )
 {
-	record_sp();
 /* The list item knows which list it is in.  Obtain the list from the list
 item. */
 List_t * const pxList = pxItemToRemove->pxContainer;
