@@ -158,10 +158,8 @@ blt		t0, x0, handle_other_traps
 	addi	t0, t0, -3
 	bgt		t0,	x0,	exception
 environment_switch:
-	
-	csrr	t6, mcause	//for debug
 
-#if 1 //for debug
+#if 0 //for debug
 	//call ecall_cnter
 	load_x t1, ecall_cnt
 	addi t1, t1, 1
