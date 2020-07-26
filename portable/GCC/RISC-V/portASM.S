@@ -222,13 +222,9 @@ exception:
 	nop
 	j exception
 
-
-
 ecall_yield:
-
 handle_other_traps:
 #endif
-
 	addi sp, sp, -portCONTEXT_SIZE
 	store_x x1, 1 * portWORD_SIZE( sp )
 	store_x x5, 2 * portWORD_SIZE( sp )
@@ -290,15 +286,6 @@ handle_asynchronous:
 		load_x t0, pullMachineTimerCompareRegister  /* Load address of compare register into t0. */
 		load_x t1, pullNextTime  		/* Load the address of ullNextTime into t1. */
 
-#if 1 /*for debug*/
-	//call ecall_cnter
-	load_x t5, time_int_cnt
-	addi t5, t5, 1
-	la t6, ecall_cnt
-    sw t5, 0(t6)
-#endif
-
-
 		#if( __riscv_xlen == 32 )
 
 			/* Update the 64-bit mtimer compare match value in two 32-bit writes. */
@@ -339,14 +326,6 @@ handle_asynchronous:
 		bne a0, t1, as_yet_unhandled	/* Something as yet unhandled. */
 
 #endif /* portasmHAS_MTIME */
-
-#if 1 /*for debug*/
-	//call ecall_cnter
-	load_x t1, int_cnt
-	addi t1, t1, 1
-	la t2, int_cnt
-    sw t1, 0(t2)
-#endif
 
 	load_x sp, xISRStackTop				/* Switch to ISR stack before function call. */
 	jal portasmHANDLE_INTERRUPT			/* Jump to the interrupt handler if there is no CLINT or if there is a CLINT and it has been determined that an external interrupt is pending. */
@@ -425,19 +404,6 @@ processed_source:
 	csrw mie, t0
 #endif
 
-#if( USE_PRIVILEDGE_MODE == 1 )
-	li a0, 0x1000
-	csrc mstatus, a0
-	li a0, 0x800
-	csrs mstatus, a0
-
-	csrr t0, mstatus
-    li a0, 0x1800
-    and t0, t0, a0
-    srli t0, t0, 11
-    la a0, privilege_status
-    sw t0, 0(a0)
-#endif
 
 	load_x  x1, 1 * portWORD_SIZE( sp )
 	load_x  x5, 2 * portWORD_SIZE( sp )		/* t0 */
@@ -603,14 +569,6 @@ xPortStartFirstTask:
 .align 8
 .func
 pxPortInitialiseStack:
-
-#if 1 /*for debug*/
-	//call ecall_cnter
-	load_x t1, first_task_cnt
-	addi t1, t1, 1
-	la t2, first_task_cnt
-    sw t1, 0(t2)
-#endif
 
 	csrr t0, mstatus					/* Obtain current mstatus value. */
 #if ( USE_PRIVILEDGE_MODE == 0 )
