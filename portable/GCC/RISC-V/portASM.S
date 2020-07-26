@@ -131,6 +131,8 @@ at the top of this file. */
 .extern ecall_cnt
 .extern debug_search
 .extern sp_data
+.extern time_int_cnt
+.extern val
 
 #if( use_PRIVILEDGE_MODE == 1 )
 .extern privilege_status
@@ -149,25 +151,37 @@ freertos_risc_v_trap_handler:
 	//csrw	mscratch, t0
     csrr	t0, mcause
 
+blt		t0, x0, handle_other_traps
+
 	addi	t0, t0, -8
-	blt		t0, x0, handle_other_traps /* mcause < 8, not ecall */
+	blt		t0, x0, exception /* mcause < 8, not ecall */
 	addi	t0, t0, -3
-	bgt		t0,	x0,	handle_other_traps
+	bgt		t0,	x0,	exception
 environment_switch:
 	
-#if 0 //for debug
+	csrr	t6, mcause	//for debug
+
+#if 1 //for debug
 	//call ecall_cnter
 	load_x t1, ecall_cnt
 	addi t1, t1, 1
 	la t2, ecall_cnt
     sw t1, 0(t2)
+    csrw mscratch, a6
 #endif
-	csrw	mscratch, a0
 
+#if 0
 	beq	a0,	x0, handle_other_traps
 	la t0, 1f
 	slli	a0, a0, 2
 	add t0, t0, a0
+#else
+	load_x t1, val
+	beq	t1,	x0, handle_other_traps
+	la t0, 1f
+	slli	t1, t1, 2
+	add t0, t0, t1
+#endif
 	jr t0
 1:
 	jal x0, ecall_yield
@@ -176,7 +190,7 @@ environment_switch:
 	jal x0, ecall_switch_to_machine
 	jal x0, ecall_switch_to_supervisor
 
-#if 1
+#if 0
 ecall_disable_interrupt:
 	/* Clear mpie */
 	li a0, 0x80
@@ -208,33 +222,7 @@ ecall_switch_to_supervisor:
 	li a0, 0x800
 	csrs mstatus, a0
 	j ecall_mret
-#else
-ecall_disable_interrupt:
-	/* Clear mpie */
-	li a0, 0x880
-	csrc mie, a0
-	j ecall_mret
 
-ecall_enable_interrupt:
-	/* Set mpie */
-	li a0, 0x800
-	csrs mie, a0
-	j ecall_mret
-
-ecall_switch_to_machine:
-	/* Set mpp */
-	li a0, 0x1800
-	csrs mstatus, a0
-	j ecall_mret
-
-ecall_switch_to_supervisor:
-	/* Clear mpp */
-	li a0, 0x1800
-	csrc mstatus, a0
-	li a0, 0x800
-	csrs mstatus, a0
-	j ecall_mret
-#endif
 ecall_mret:
 	csrr t0, mstatus
     li a0, 0x1800
@@ -249,6 +237,54 @@ ecall_mret:
 	/* restore t0 */
 	//csrr	t0, mscratch
 	mret
+#else
+ecall_disable_interrupt:
+	/* Clear mpie */
+	li t6, 0x880
+	csrc mie, t6
+	j ecall_mret
+
+ecall_enable_interrupt:
+	/* Set mpie */
+	li t6, 0x880
+	csrs mie, t6
+	j ecall_mret
+
+ecall_switch_to_machine:
+	/* Set mpp */
+	li t6, 0x1800
+	csrs mstatus, t6
+	j ecall_mret
+
+ecall_switch_to_supervisor:
+	/* Clear mpp */
+	li t6, 0x1800
+	csrc mstatus, t6
+	li t6, 0x800
+	csrs mstatus, t6
+	j ecall_mret
+
+ecall_mret:
+	csrr t0, mstatus
+    li t6, 0x1800
+    and t0, t0, t6
+    srli t0, t0, 11
+    la t6, privilege_status
+    sw t0, 0(t6)
+
+	csrr t0, mepc
+	addi	t0, t0, 4
+	csrw	mepc, t0
+	/* restore t0 */
+	//csrr	t0, mscratch
+	mret
+#endif
+
+exception:
+	nop
+	j exception
+
+
 
 ecall_yield:
 
@@ -321,7 +357,7 @@ handle_asynchronous:
 
 #if 1 /*for debug*/
 	//call ecall_cnter
-	load_x t5, ecall_cnt
+	load_x t5, time_int_cnt
 	addi t5, t5, 1
 	la t6, ecall_cnt
     sw t5, 0(t6)
@@ -420,6 +456,20 @@ processed_source:
 	//load_x  t0, 29 * portWORD_SIZE( sp )
 	//csrw mstatus, t0						/* Required for MPIE bit. */
 
+#if( use_PRIVILEDGE_MODE == 1 )
+	li a0, 0x1000
+	csrc mstatus, a0
+	li a0, 0x800
+	csrs mstatus, a0
+
+	csrr t0, mstatus
+    li a0, 0x1800
+    and t0, t0, a0
+    srli t0, t0, 11
+    la a0, privilege_status
+    sw t0, 0(a0)
+#endif
+
 	load_x  x1, 1 * portWORD_SIZE( sp )
 	load_x  x5, 2 * portWORD_SIZE( sp )		/* t0 */
 	load_x  x6, 3 * portWORD_SIZE( sp )		/* t1 */
@@ -449,20 +499,6 @@ processed_source:
 	load_x  x30, 27 * portWORD_SIZE( sp )	/* t5 */
 	load_x  x31, 28 * portWORD_SIZE( sp )	/* t6 */
 	addi sp, sp, portCONTEXT_SIZE
-
-#if( use_PRIVILEDGE_MODE == 1 )
-	li a0, 0x1000
-	csrc mstatus, a0
-	li a0, 0x800
-	csrs mstatus, a0
-
-	csrr t0, mstatus
-    li a0, 0x1800
-    and t0, t0, a0
-    srli t0, t0, 11
-    la a0, privilege_status
-    sw t0, 0(a0)
-#endif
 
 	mret
 	.endfunc
@@ -496,6 +532,12 @@ xPortStartFirstTask:
 	csrrw  x0, mstatus, t0					/* Interrupts enabled from here! */
 #endif
 
+#if( use_PRIVILEDGE_MODE == 1 )
+	la t6, val
+	addi t4, x0, 4
+	sw t4, 0(t6)
+#endif
+
 	load_x  x5, 2 * portWORD_SIZE( sp )		/* t0 */
 	load_x  x6, 3 * portWORD_SIZE( sp )		/* t1 */
 	load_x  x7, 4 * portWORD_SIZE( sp )		/* t2 */
@@ -526,7 +568,6 @@ xPortStartFirstTask:
 	addi	sp, sp, portCONTEXT_SIZE
 
 #if( use_PRIVILEDGE_MODE == 1 )
-	li a0, 4
 	ecall	
 #endif
 
