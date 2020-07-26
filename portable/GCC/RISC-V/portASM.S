@@ -129,7 +129,7 @@ at the top of this file. */
 .extern time_int_cnt
 .extern val
 
-#if( USE_PRIVILEDGE_MODE == 1 )
+#if( USE_PRIVILEDGE_MODE != 0 )
 .extern privilege_status
 #endif
 /*-----------------------------------------------------------*/
@@ -138,7 +138,7 @@ at the top of this file. */
 .func
 freertos_risc_v_trap_handler:
 
-#if( USE_PRIVILEDGE_MODE == 1 )
+#if( USE_PRIVILEDGE_MODE != 0 )
 	csrw	mscratch, t0
 	csrr	t0, mcause
 	blt		t0, x0, handle_other_traps
@@ -155,8 +155,10 @@ environment_switch:
 	slli	a0, a0, 2
 	add t0, t0, a0
 #else
-	load_x t1, val
+	//load_x t1, val
+	csrr t1, sscratch
 	beq	t1,	x0, handle_other_traps
+	//beq sscratch, x0, handle_other_traps
 	la t0, 1f
 	slli	t1, t1, 2
 	add t0, t0, t1
@@ -414,7 +416,7 @@ processed_source:
 	csrw mstatus, t0						/* Required for MPIE bit. */
 #endif
 
-#if( USE_PRIVILEDGE_MODE == 1 )
+#if( USE_PRIVILEDGE_MODE != 0 )
 	li a0, 0x1000
 	csrc mstatus, a0
 	li a0, 0x800
@@ -486,10 +488,14 @@ xPortStartFirstTask:
 	csrrw  x0, mstatus, t0					/* Interrupts enabled from here! */
 #endif
 
-#if( USE_PRIVILEDGE_MODE == 1 )
+#if( USE_PRIVILEDGE_MODE != 0 )
+	#if 0
 	la t6, val
 	addi t4, x0, 4
 	sw t4, 0(t6)
+	#else
+	csrwi sscratch, 4
+	#endif
 #endif
 
 	load_x  x5, 2 * portWORD_SIZE( sp )		/* t0 */
@@ -521,7 +527,7 @@ xPortStartFirstTask:
 	load_x  x31, 28 * portWORD_SIZE( sp )	/* t6 */
 	addi	sp, sp, portCONTEXT_SIZE
 
-#if( USE_PRIVILEDGE_MODE == 1 )
+#if( USE_PRIVILEDGE_MODE != 0 )
 	ecall	
 #endif
 
