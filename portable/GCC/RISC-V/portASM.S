@@ -425,7 +425,7 @@ processed_source:
 	csrw mie, t0
 #endif
 
-#if( use_PRIVILEDGE_MODE == 1 )
+#if( USE_PRIVILEDGE_MODE == 1 )
 	li a0, 0x1000
 	csrc mstatus, a0
 	li a0, 0x800
@@ -641,10 +641,3 @@ chip_specific_stack_frame:				/* First add any chip specific registers to the st
 	ret
 	.endfunc
 /*-----------------------------------------------------------*/
-
-.align 8
-.func
-record_sp:
-	la  t0, sp_data			/* Load pxCurrentTCB. */
-	sw  sp, 0( t0 )
-	ret
