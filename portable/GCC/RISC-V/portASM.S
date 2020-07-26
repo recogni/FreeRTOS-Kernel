@@ -141,6 +141,8 @@ freertos_risc_v_trap_handler:
 	csrr	t0, mcause
 	blt		t0, x0, handle_other_traps
 
+blt		t0, x0, handle_other_traps
+
 	addi	t0, t0, -8
 	blt		t0, x0, is_exception /* mcause < 8, not ecall */
 	addi	t0, t0, -3
@@ -214,6 +216,13 @@ ecall_mret:
 	/* restore t0 */
 	//csrr t0, mscratch
 	mret
+#endif
+
+exception:
+	nop
+	j exception
+
+
 
 ecall_yield:
 
@@ -283,7 +292,7 @@ handle_asynchronous:
 
 #if 1 /*for debug*/
 	//call ecall_cnter
-	load_x t5, ecall_cnt
+	load_x t5, time_int_cnt
 	addi t5, t5, 1
 	la t6, ecall_cnt
     sw t5, 0(t6)
@@ -416,6 +425,20 @@ processed_source:
 	csrw mie, t0
 #endif
 
+#if( use_PRIVILEDGE_MODE == 1 )
+	li a0, 0x1000
+	csrc mstatus, a0
+	li a0, 0x800
+	csrs mstatus, a0
+
+	csrr t0, mstatus
+    li a0, 0x1800
+    and t0, t0, a0
+    srli t0, t0, 11
+    la a0, privilege_status
+    sw t0, 0(a0)
+#endif
+
 	load_x  x1, 1 * portWORD_SIZE( sp )
 	load_x  x5, 2 * portWORD_SIZE( sp )		/* t0 */
 	load_x  x6, 3 * portWORD_SIZE( sp )		/* t1 */
@@ -445,20 +468,6 @@ processed_source:
 	load_x  x30, 27 * portWORD_SIZE( sp )	/* t5 */
 	load_x  x31, 28 * portWORD_SIZE( sp )	/* t6 */
 	addi sp, sp, portCONTEXT_SIZE
-
-#if( use_PRIVILEDGE_MODE == 1 )
-	li a0, 0x1000
-	csrc mstatus, a0
-	li a0, 0x800
-	csrs mstatus, a0
-
-	csrr t0, mstatus
-    li a0, 0x1800
-    and t0, t0, a0
-    srli t0, t0, 11
-    la a0, privilege_status
-    sw t0, 0(a0)
-#endif
 
 	mret
 	.endfunc
