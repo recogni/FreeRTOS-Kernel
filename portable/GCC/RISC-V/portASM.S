@@ -127,7 +127,7 @@ at the top of this file. */
 .extern debug_search
 .extern sp_data
 .extern time_int_cnt
-.extern val
+.extern int_record
 
 #if( USE_PRIVILEDGE_MODE != 0 )
 .extern privilege_status
@@ -139,17 +139,19 @@ at the top of this file. */
 freertos_risc_v_trap_handler:
 
 #if( USE_PRIVILEDGE_MODE != 0 )
-	csrw	mscratch, t0
+	//csrw	mscratch, t0
 	csrr	t0, mcause
 	blt		t0, x0, handle_other_traps
 
 	addi	t0, t0, -8
-	blt		t0, x0, is_exception /* mcause < 8, not ecall */
+	blt		t0, x0, exception /* mcause < 8, not ecall */
 	addi	t0, t0, -3
-	bgt		t0,	x0,	is_exception
+	bgt		t0,	x0,	exception
 
 environment_switch:
 	csrr t5, sscratch
+	csrw mscratch, t5
+	csrwi sscratch, 1
 	beq	t5,	x0, handle_other_traps
 	la t0, 1f
 	slli	t5, t5, 2
@@ -193,6 +195,18 @@ ecall_mret:
     li t6, 0x1800
     and t0, t0, t6
     srli t0, t0, 11
+
+//for debug
+#if 1
+	csrr t1, mie
+	la t6, int_record
+	sw t1, 0(t6)
+	add t0, t0, t1
+	slli t0, t0, 4
+	csrr t1, mscratch
+	add t0, t0, t1
+#endif
+
     la t6, privilege_status
     sw t0, 0(t6)
 
@@ -200,10 +214,15 @@ ecall_mret:
 	addi	t0, t0, 4
 	csrw	mepc, t0
 	/* restore t0 */
-	csrr t0, mscratch
+	//csrr t0, mscratch
 	mret
 
+exception:
+	nop
+	j exception
+
 ecall_yield:
+	nop
 handle_other_traps:
 #endif
 	
@@ -323,7 +342,11 @@ test_if_environment_call:
 #else
 	li t0, 9 							/* 11 == environment call. */
 #endif
+
+	beq a0, t0, next
+	li t0, 11
 	bne a0, t0, is_exception			/* Not an M environment call, so some other exception. */
+next:
 	load_x sp, xISRStackTop				/* Switch to ISR stack before function call. */
 	jal vTaskSwitchContext
 	j processed_source
@@ -364,9 +387,23 @@ processed_source:
     li a0, 0x1800
     and t0, t0, a0
     srli t0, t0, 11
-    la a0, privilege_status
-    sw t0, 0(a0)
+	
+#if 1	//for debug
+	csrr t1, mie
+	la t6, int_record
+	sw t1, 0(t6)
+	add t0, t0, t1
+	slli t0, t0, 4
+	csrr t1, mscratch
+	add t0, t0, t1
 #endif
+
+    la t6, privilege_status
+    sw t0, 0(t6)
+#endif
+
+	li t0, 0x880
+	csrw mie, t0
 
 	load_x  x1, 1 * portWORD_SIZE( sp )
 	load_x  x5, 2 * portWORD_SIZE( sp )		/* t0 */
