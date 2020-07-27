@@ -216,11 +216,6 @@ ecall_mret:
 	/* restore t0 */
 	//csrr t0, mscratch
 	mret
-#endif
-
-exception:
-	nop
-	j exception
 
 ecall_yield:
 handle_other_traps:
