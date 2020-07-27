@@ -144,9 +144,9 @@ freertos_risc_v_trap_handler:
 	blt		t0, x0, handle_other_traps
 
 	addi	t0, t0, -8
-	blt		t0, x0, exception /* mcause < 8, not ecall */
+	blt		t0, x0, is_exception /* mcause < 8, not ecall */
 	addi	t0, t0, -3
-	bgt		t0,	x0,	exception
+	bgt		t0,	x0,	is_exception
 
 environment_switch:
 	csrr t5, sscratch
@@ -197,7 +197,7 @@ ecall_mret:
     srli t0, t0, 11
 
 //for debug
-#if 1
+#if 0
 	csrr t1, mie
 	la t6, int_record
 	sw t1, 0(t6)
@@ -216,10 +216,6 @@ ecall_mret:
 	/* restore t0 */
 	//csrr t0, mscratch
 	mret
-
-exception:
-	nop
-	j exception
 
 ecall_yield:
 	nop
@@ -340,7 +336,7 @@ test_if_environment_call:
 #if( USE_PRIVILEDGE_MODE == 0 )
 	li t0, 11 							/* 11 == environment call. */
 #else
-	li t0, 9 							/* 11 == environment call. */
+	li t0, 9 							/* 9 == environment call. */
 #endif
 
 	beq a0, t0, next
@@ -388,7 +384,7 @@ processed_source:
     and t0, t0, a0
     srli t0, t0, 11
 	
-#if 1	//for debug
+#if 0	//for debug
 	csrr t1, mie
 	la t6, int_record
 	sw t1, 0(t6)
@@ -400,10 +396,10 @@ processed_source:
 
     la t6, privilege_status
     sw t0, 0(t6)
-#endif
 
 	li t0, 0x880
 	csrw mie, t0
+#endif
 
 	load_x  x1, 1 * portWORD_SIZE( sp )
 	load_x  x5, 2 * portWORD_SIZE( sp )		/* t0 */
@@ -464,13 +460,7 @@ xPortStartFirstTask:
 #endif
 
 #if( USE_PRIVILEDGE_MODE != 0 )
-	#if 0
-	la t6, val
-	addi t4, x0, 4
-	sw t4, 0(t6)
-	#else
 	csrwi sscratch, 4
-	#endif
 #endif
 
 	load_x  x5, 2 * portWORD_SIZE( sp )		/* t0 */
