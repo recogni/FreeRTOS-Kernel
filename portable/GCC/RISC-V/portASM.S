@@ -144,9 +144,9 @@ freertos_risc_v_trap_handler:
 blt		t0, x0, handle_other_traps
 
 	addi	t0, t0, -8
-	blt		t0, x0, exception /* mcause < 8, not ecall */
+	blt		t0, x0, is_exception /* mcause < 8, not ecall */
 	addi	t0, t0, -3
-	bgt		t0,	x0,	exception
+	bgt		t0,	x0,	is_exception
 
 environment_switch:
 	csrr t5, sscratch
@@ -216,10 +216,6 @@ ecall_mret:
 	/* restore t0 */
 	//csrr t0, mscratch
 	mret
-
-exception:
-	nop
-	j exception
 
 ecall_yield:
 	nop
@@ -386,7 +382,6 @@ processed_source:
     li a0, 0x1800
     and t0, t0, a0
     srli t0, t0, 11
-
 #if 0	//for debug
 	csrr t1, mie
 	la t6, int_record
@@ -403,7 +398,6 @@ processed_source:
 	li t0, 0x880
 	csrw mie, t0
 #endif
-
 
 	load_x  x1, 1 * portWORD_SIZE( sp )
 	load_x  x5, 2 * portWORD_SIZE( sp )		/* t0 */
