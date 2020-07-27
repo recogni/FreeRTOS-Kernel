@@ -144,25 +144,16 @@ freertos_risc_v_trap_handler:
 	blt		t0, x0, handle_other_traps
 
 	addi	t0, t0, -8
-	blt		t0, x0, exception /* mcause < 8, not ecall */
+	blt		t0, x0, is_exception /* mcause < 8, not ecall */
 	addi	t0, t0, -3
-	bgt		t0,	x0,	exception
-environment_switch:
+	bgt		t0,	x0,	is_exception
 
-#if 0
-	beq	a0,	x0, handle_other_traps
+environment_switch:
+	csrr t5, sscratch
+	beq	t5,	x0, handle_other_traps
 	la t0, 1f
-	slli	a0, a0, 2
-	add t0, t0, a0
-#else
-	//load_x t1, val
-	csrr t1, sscratch
-	beq	t1,	x0, handle_other_traps
-	//beq sscratch, x0, handle_other_traps
-	la t0, 1f
-	slli	t1, t1, 2
-	add t0, t0, t1
-#endif
+	slli	t5, t5, 2
+	add t0, t0, t5
 	jr t0
 1:
 	jal x0, ecall_yield
@@ -171,54 +162,6 @@ environment_switch:
 	jal x0, ecall_switch_to_machine
 	jal x0, ecall_switch_to_supervisor
 
-#if 0
-ecall_disable_interrupt:
-	/* Clear mpie */
-	li a0, 0x80
-	csrc mstatus, a0
-
-	li a0, 0x880
-	csrc mie, a0
-	j ecall_mret
-
-ecall_enable_interrupt:
-	/* Set mpie */
-	li a0, 0x80
-	csrs mstatus, a0
-
-	li a0, 0x880
-	csrs mie, a0
-	j ecall_mret
-
-ecall_switch_to_machine:
-	/* Set mpp */
-	li a0, 0x1800
-	csrs mstatus, a0
-	j ecall_mret
-
-ecall_switch_to_supervisor:
-	/* Clear mpp */
-	li a0, 0x1000
-	csrc mstatus, a0
-	li a0, 0x800
-	csrs mstatus, a0
-	j ecall_mret
-
-ecall_mret:
-	csrr t0, mstatus
-    li a0, 0x1800
-    and t0, t0, a0
-    srli t0, t0, 11
-    la a0, privilege_status
-    sw t0, 0(a0)
-
-	csrr t0, mepc
-	addi	t0, t0, 4
-	csrw	mepc, t0
-	/* restore t0 */
-	//csrr	t0, mscratch
-	mret
-#else
 ecall_disable_interrupt:
 	/* Clear mpie */
 	li t6, 0x880
@@ -259,11 +202,6 @@ ecall_mret:
 	/* restore t0 */
 	csrr t0, mscratch
 	mret
-#endif
-
-exception:
-	nop
-	j exception
 
 ecall_yield:
 handle_other_traps:
