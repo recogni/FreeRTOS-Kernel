@@ -69,8 +69,6 @@
 
 #include "freertos_risc_v_chip_specific_extensions.h"
 
-//#include "../../../../../src/scpu/hal/drivers/priviledge.h"
-
 /* Check the freertos_risc_v_chip_specific_extensions.h and/or command line
 definitions. */
 #if defined( portasmHAS_CLINT ) && defined( portasmHAS_MTIME )
@@ -218,7 +216,7 @@ ecall_mret:
 	mret
 
 ecall_yield:
-	nop
+
 handle_other_traps:
 #endif
 	addi sp, sp, -portCONTEXT_SIZE
