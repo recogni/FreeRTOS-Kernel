@@ -69,8 +69,6 @@
 
 #include "freertos_risc_v_chip_specific_extensions.h"
 
-//#include "../../../../../src/scpu/hal/drivers/priviledge.h"
-
 /* Check the freertos_risc_v_chip_specific_extensions.h and/or command line
 definitions. */
 #if defined( portasmHAS_CLINT ) && defined( portasmHAS_MTIME )
@@ -102,8 +100,11 @@ specific version of freertos_risc_v_chip_specific_extensions.h.  See the notes
 at the top of this file. */
 #define portCONTEXT_SIZE ( 30 * portWORD_SIZE )
 
+#ifdef DISABLE_PRIVILEDGE_MODE
+#define USE_PRIVILEDGE_MODE 0
+#else
 #define USE_PRIVILEDGE_MODE 1
-
+#endif
 
 .global xPortStartFirstTask
 .global freertos_risc_v_trap_handler
@@ -120,17 +121,12 @@ at the top of this file. */
 .extern xISRStackTop
 .extern portasmHANDLE_INTERRUPT
 
-.extern cnt_first_task
-.extern int_cnter
-.extern ecall_cnter
-.extern ecall_cnt
-.extern debug_search
-.extern sp_data
-.extern time_int_cnt
-.extern int_record
+#if 0
+.extern int_record	//the variable used for debugging utility
+#endif
 
 #if( USE_PRIVILEDGE_MODE != 0 )
-.extern privilege_status
+.extern priviledge_status
 #endif
 /*-----------------------------------------------------------*/
 
@@ -207,7 +203,7 @@ ecall_mret:
 	add t0, t0, t1
 #endif
 
-    la t6, privilege_status
+    la t6, priviledge_status
     sw t0, 0(t6)
 
 	csrr t0, mepc
@@ -218,7 +214,7 @@ ecall_mret:
 	mret
 
 ecall_yield:
-	nop
+
 handle_other_traps:
 #endif
 	
@@ -394,7 +390,7 @@ processed_source:
 	add t0, t0, t1
 #endif
 
-    la t6, privilege_status
+    la t6, priviledge_status
     sw t0, 0(t6)
 
 	li t0, 0x880

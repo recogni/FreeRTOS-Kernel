@@ -168,7 +168,7 @@ BaseType_t xPortStartScheduler(void)
     extern void xPortStartFirstTask(void);
 #if( USE_PRIVILEDGE_MODE == 1 )
 {
-	vRaisePrivilege();
+    vRaisePriviledge();
 }
 #endif
 #if (configASSERT_DEFINED == 1)

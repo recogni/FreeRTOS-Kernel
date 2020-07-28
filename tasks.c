@@ -1015,7 +1015,7 @@ UBaseType_t x;
 	the top of stack variable is updated. */
 	#if( USE_PRIVILEDGE_MODE == 1 )	
 	{
-		vRaisePrivilege();
+		vRaisePriviledge();
 	}
 	#endif
 	#if( portUSING_MPU_WRAPPERS == 1 )
@@ -1068,7 +1068,7 @@ UBaseType_t x;
 
 	#if( USE_PRIVILEDGE_MODE == 1 )
 	{	
-		vResetPrivilege();
+		vResetPriviledge();
 	}
 	#endif
 	if( pxCreatedTask != NULL )

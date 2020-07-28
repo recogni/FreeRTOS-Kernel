@@ -29,7 +29,7 @@
 #ifndef PORTMACRO_H
 #define PORTMACRO_H
 
-#include "../../../../../src/scpu/hal/drivers/priviledge.h"
+#include "../../../../../src/scpu/hal/drivers/recogni_priviledge.h"
 
 #ifdef __cplusplus
 extern "C"
