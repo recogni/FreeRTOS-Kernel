@@ -120,6 +120,7 @@ at the top of this file. */
 .extern uxTimerIncrementsForOneTick /* size_t type so 32-bit on 32-bit core and 64-bits on 64-bit core. */
 .extern xISRStackTop
 .extern portasmHANDLE_INTERRUPT
+.extern	mmu_exception_handler
 
 #if 0
 .extern int_record	//the variable used for debugging utility
@@ -136,6 +137,7 @@ freertos_risc_v_trap_handler:
 
 #if( USE_PRIVILEDGE_MODE != 0 )
 	//csrw	mscratch, t0
+
 	csrr	t0, mcause
 	blt		t0, x0, handle_other_traps
 
@@ -347,6 +349,11 @@ is_exception:
 	csrr t0, mcause						/* For viewing in the debugger only. */
 	csrr t1, mepc						/* For viewing in the debugger only */
 	csrr t2, mstatus
+
+#if( USE_PRIVILEDGE_MODE != 0 )
+	jal mmu_exception_handler
+#endif	//( USE_PRIVILEDGE_MODE != 0 )
+
 	j is_exception						/* No other exceptions handled yet. */
 
 as_yet_unhandled:
