@@ -146,7 +146,7 @@ freertos_risc_v_trap_handler:
 	addi	t0, t0, -3
 	bgt		t0,	x0,	is_exception
 
-environment_switch:
+system_switch:	//Heandle traps for system level requests and interrupts
 	csrr t5, sscratch
 	csrw mscratch, t5
 	csrwi sscratch, 1
@@ -156,43 +156,43 @@ environment_switch:
 	add t0, t0, t5
 	jr t0
 1:
-	jal x0, ecall_yield
-	jal x0, ecall_disable_interrupt
-	jal x0, ecall_enable_interrupt
-	jal x0, ecall_switch_to_machine
-	jal x0, ecall_switch_to_supervisor
+	jal x0, syscall_yield
+	jal x0, syscall_disable_interrupt
+	jal x0, syscall_enable_interrupt
+	jal x0, syscall_switch_to_machine
+	jal x0, syscall_switch_to_supervisor
 
-ecall_disable_interrupt:
+syscall_disable_interrupt:
 	/* Clear mpie */
 	li t6, 0x880
 	csrc mie, t6
-	j ecall_mret
+	j syscall_mret
 
-ecall_enable_interrupt:
+syscall_enable_interrupt:
 	/* Set mpie */
 	li t6, 0x880
 	csrs mie, t6
-	j ecall_mret
+	j syscall_mret
 
-ecall_switch_to_machine:
+syscall_switch_to_machine:
 	/* Set mpp */
 	li t6, 0x1800
 	csrs mstatus, t6
-	j ecall_mret
+	j syscall_mret
 
-ecall_switch_to_supervisor:
+syscall_switch_to_supervisor:
 	/* Clear mpp */
 	li t6, 0x1800
 	csrc mstatus, t6
 	li t6, 0x800
 	csrs mstatus, t6
-	j ecall_mret
+	j syscall_mret
 
-ecall_mret:
+syscall_mret:
 	csrr t0, mstatus
-    li t6, 0x1800
-    and t0, t0, t6
-    srli t0, t0, 11
+	li t6, 0x1800
+	and t0, t0, t6
+	srli t0, t0, 11
 
 //for debug
 #if 0
@@ -215,7 +215,7 @@ ecall_mret:
 	//csrr t0, mscratch
 	mret
 
-ecall_yield:
+syscall_yield:
 
 handle_other_traps:
 #endif
