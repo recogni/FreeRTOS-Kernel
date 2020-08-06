@@ -1013,7 +1013,7 @@ UBaseType_t x;
 	but had been interrupted by the scheduler.  The return address is set
 	to the start of the task function. Once the stack has been initialised
 	the top of stack variable is updated. */
-	#if( USE_PRIVILEDGE_MODE == 1 )	
+	#if( USE_PRIVILEDGE_MODE == 1 )
 	{
 		vRaisePriviledge();
 	}
@@ -1067,7 +1067,7 @@ UBaseType_t x;
 	#endif /* portUSING_MPU_WRAPPERS */
 
 	#if( USE_PRIVILEDGE_MODE == 1 )
-	{	
+	{
 		vResetPriviledge();
 	}
 	#endif

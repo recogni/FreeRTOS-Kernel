@@ -120,6 +120,7 @@ at the top of this file. */
 .extern uxTimerIncrementsForOneTick /* size_t type so 32-bit on 32-bit core and 64-bits on 64-bit core. */
 .extern xISRStackTop
 .extern portasmHANDLE_INTERRUPT
+.extern	mmu_exception_handler
 
 #if 0
 .extern int_record	//the variable used for debugging utility
@@ -136,6 +137,7 @@ freertos_risc_v_trap_handler:
 
 #if( USE_PRIVILEDGE_MODE != 0 )
 	//csrw	mscratch, t0
+
 	csrr	t0, mcause
 	blt		t0, x0, handle_other_traps
 
@@ -144,7 +146,7 @@ freertos_risc_v_trap_handler:
 	addi	t0, t0, -3
 	bgt		t0,	x0,	is_exception
 
-environment_switch:
+system_switch:	//Heandle traps for system level requests and interrupts
 	csrr t5, sscratch
 	csrw mscratch, t5
 	csrwi sscratch, 1
@@ -154,43 +156,43 @@ environment_switch:
 	add t0, t0, t5
 	jr t0
 1:
-	jal x0, ecall_yield
-	jal x0, ecall_disable_interrupt
-	jal x0, ecall_enable_interrupt
-	jal x0, ecall_switch_to_machine
-	jal x0, ecall_switch_to_supervisor
+	jal x0, syscall_yield
+	jal x0, syscall_disable_interrupt
+	jal x0, syscall_enable_interrupt
+	jal x0, syscall_switch_to_machine
+	jal x0, syscall_switch_to_supervisor
 
-ecall_disable_interrupt:
+syscall_disable_interrupt:
 	/* Clear mpie */
 	li t6, 0x880
 	csrc mie, t6
-	j ecall_mret
+	j syscall_mret
 
-ecall_enable_interrupt:
+syscall_enable_interrupt:
 	/* Set mpie */
 	li t6, 0x880
 	csrs mie, t6
-	j ecall_mret
+	j syscall_mret
 
-ecall_switch_to_machine:
+syscall_switch_to_machine:
 	/* Set mpp */
 	li t6, 0x1800
 	csrs mstatus, t6
-	j ecall_mret
+	j syscall_mret
 
-ecall_switch_to_supervisor:
+syscall_switch_to_supervisor:
 	/* Clear mpp */
 	li t6, 0x1800
 	csrc mstatus, t6
 	li t6, 0x800
 	csrs mstatus, t6
-	j ecall_mret
+	j syscall_mret
 
-ecall_mret:
+syscall_mret:
 	csrr t0, mstatus
-    li t6, 0x1800
-    and t0, t0, t6
-    srli t0, t0, 11
+	li t6, 0x1800
+	and t0, t0, t6
+	srli t0, t0, 11
 
 //for debug
 #if 0
@@ -213,11 +215,10 @@ ecall_mret:
 	//csrr t0, mscratch
 	mret
 
-ecall_yield:
+syscall_yield:
 
 handle_other_traps:
 #endif
-	
 	addi sp, sp, -portCONTEXT_SIZE
 	store_x x1, 1 * portWORD_SIZE( sp )
 	store_x x5, 2 * portWORD_SIZE( sp )
@@ -347,6 +348,11 @@ is_exception:
 	csrr t0, mcause						/* For viewing in the debugger only. */
 	csrr t1, mepc						/* For viewing in the debugger only */
 	csrr t2, mstatus
+
+#if( USE_PRIVILEDGE_MODE != 0 )
+	jal mmu_exception_handler
+#endif	//( USE_PRIVILEDGE_MODE != 0 )
+
 	j is_exception						/* No other exceptions handled yet. */
 
 as_yet_unhandled:
@@ -379,7 +385,6 @@ processed_source:
     li a0, 0x1800
     and t0, t0, a0
     srli t0, t0, 11
-	
 #if 0	//for debug
 	csrr t1, mie
 	la t6, int_record
@@ -489,7 +494,7 @@ xPortStartFirstTask:
 	addi	sp, sp, portCONTEXT_SIZE
 
 #if( USE_PRIVILEDGE_MODE != 0 )
-	ecall	
+	ecall
 #endif
 
 	ret
@@ -587,7 +592,7 @@ chip_specific_stack_frame:				/* First add any chip specific registers to the st
 1:
 	addi a0, a0, -portWORD_SIZE
 	store_x a1, 0(a0)					/* mret value (pxCode parameter) onto the stack. */
-	
+
 	ret
 	.endfunc
 /*-----------------------------------------------------------*/
