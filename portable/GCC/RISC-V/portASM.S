@@ -141,8 +141,6 @@ freertos_risc_v_trap_handler:
 	csrr	t0, mcause
 	blt		t0, x0, handle_other_traps
 
-blt		t0, x0, handle_other_traps
-
 	addi	t0, t0, -8
 	blt		t0, x0, is_exception /* mcause < 8, not ecall */
 	addi	t0, t0, -3
